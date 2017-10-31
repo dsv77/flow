@@ -1,0 +1,14 @@
+gensim
+Keras<2.0
+nltk
+numpy
+pandas
+requests
+stemming
+lxml
+flask
+sklearn
+matplotlib
+dill
+h5py
+pycrypto
