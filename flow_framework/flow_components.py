@@ -1134,13 +1134,18 @@ class LoadClass2IdFlowComponent(AbstractFlowComponent):
         if os.path.isfile(class2id_file):
             class2id = pickle.load(open(class2id_file, 'rb'))
         else:
-            class2id = {}
-            counter = 0
-            for i, sample in enumerate(environment['raw_train_samples_gen']()):
-                class_name = sample['class_']
-                if class_name not in class2id:
-                    class2id[class_name] = counter
-                    counter+=1
+            if 'class2samples' in environment:
+                print('Using class2smaples for class2id')
+                classes = list(environment['class2samples'].keys())
+                class2id = dict((c, i) for i, c in enumerate(classes))
+            else:
+                class2id = {}
+                counter = 0
+                for i, sample in enumerate(environment['raw_train_samples_gen']()):
+                    class_name = sample['class_']
+                    if class_name not in class2id:
+                        class2id[class_name] = counter
+                        counter+=1
             pickle.dump(class2id, open(class2id_file, 'wb'))
         environment['class2id'] = class2id
         environment.setdefault('dependencies', [])
