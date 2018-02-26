@@ -41,17 +41,19 @@ class AbstractTransformerFlowComponent(AbstractFlowComponent):
 
 
 class CompileModelFlowComponent(AbstractFlowComponent):
-    def __init__(self, loss, metrics,optimizer):
+    def __init__(self, loss, metrics,optimizer,loss_weights=[1]):
         super(self.__class__, self).__init__()
         self.loss = loss
         self.metrics = metrics
         self.optimizer = optimizer
+        self.loss_weights = loss_weights
 
     def execute(self, environment={}):
         # Compile the model so it is ready for training
         print ('Compiling model...')
         environment['model'].compile(optimizer=self.optimizer,
                              loss=self.loss,
+                                     loss_weights=self.loss_weights,
                              metrics=self.metrics)
         return environment
 
