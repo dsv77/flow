@@ -1005,7 +1005,7 @@ class PruneInfrequentWords(AbstractFlowComponent):
         id_counter = 0
         pruning_count = 0
         for token,_ in token_order:
-            count = token2count[token]
+            count = token2count[token] if token in token2count else 0
             if count >= self.min_token_count:
                 token2id[token] = id_counter
                 id_counter += 1
