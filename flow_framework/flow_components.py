@@ -540,7 +540,7 @@ class MaxWordsFlowComponent(AbstractFlowComponent):
         token2count = environment['token2count']
         if max_words < len(token_dict):
             sorted_words = sorted(token2count.items(), key=operator.itemgetter(1), reverse=True)
-            sorted_words = dict([(s, c) for s, c in sorted_words][0:max_words])
+            sorted_words = dict([(s, c) for s, c in sorted_words if s in token_dict][0:max_words])
             sorted_words = [w for w, _ in sorted(token_dict.items(), key=lambda x: x[1]) if w in sorted_words]
             environment['token2id'] = dict(zip(sorted_words, range(0, max_words)))
         return environment
@@ -665,6 +665,39 @@ class PruneNonDictTokensTransformerFlowComponent(AbstractTransformerFlowComponen
         return environment
 
 
+
+"""
+Removes all non-bigrams tokens 
+"""
+class PruneNonBigramTokensFlowComponent(AbstractFlowComponent):
+    def __init__(self, threshold=10.0, min_count=5):
+        super(self.__class__, self).__init__()
+        self.threshold = threshold
+        self.min_count = min_count
+
+
+    def execute(self, environment={}):
+        prune_list = {}
+        token2count = environment['token2count']
+        token2id = environment['token2id']
+        N = len(token2id)
+        for token in token2id:
+            if '_' in token:
+                w1, w2 = token.split('_')
+                if w1 not in token2count or w2 not in token2count or token not in token2count:
+                    continue
+                if N*(token2count[token]-self.min_count)/(token2count[w1]*token2count[w2]) < self.threshold:
+                    prune_list[token] = None
+        np.random.seed(2)
+
+        print ('Pruning %i bigrams' % len(prune_list))
+        # print(prune_list)
+        words = [s for s, c in token2id.items() if s not in prune_list]
+        words = sorted(words)
+        environment['token2id'] = dict(zip(words, range(0, len(words))))
+        return environment
+
+
 """
 A tokenize component expects a text to be a string. Output are the tokenized words.
 """
@@ -738,8 +771,6 @@ class LimitSampleTextFlowComponent(AbstractFlowComponent):
         for gen_type in self.target_generators:
             environment[gen_type] = self.raw_train_samples_gen(environment[gen_type])
         return environment
-
-
 
 
 """
@@ -1064,7 +1095,7 @@ class LoadToken2IdFlowComponent(AbstractFlowComponent):
             token2id = {}
             id_counter = 1
             for sample_num, row in enumerate(environment['raw_train_samples_gen']()):
-                if sample_num > 0 and sample_num % 1000 == 0:
+                if sample_num > 0 and sample_num % 10000 == 0:
                     print (sample_num)
                 for field in self.fields:
                     text = row[field]
