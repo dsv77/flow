@@ -1021,7 +1021,38 @@ class RemovePunktFlowComponent(AbstractTransformerFlowComponent):
         environment['transformations'].append((self.transform, [], self.__class__.__name__))
         return environment
 
+class DanishNormalizeFlowComponent(AbstractTransformerFlowComponent):
+    def generator_generator(self, it):
+        def new_generator():
+            iterator = it()
+            for sample in iterator:
+                text = sample['text']
+                if len(text) > 0:
+                    text = self.transform(text)
+                    sample['text'] = text
+                yield sample
+        return new_generator
 
+
+    def transform(self, text, env=None):
+        text = text.replace('ae', 'æ')
+        text = text.replace('oe', 'ø')
+        text = text.replace('aa', 'å')
+        text = text.replace('Ae', 'Æ')
+        text = text.replace('Oe', 'Ø')
+        text = text.replace('Aa', 'Å')
+        return text
+
+
+
+    def execute(self, environment={}):
+        environment['raw_train_samples_gen'] = self.generator_generator(environment['raw_train_samples_gen'])
+        environment['raw_valid_samples_gen'] = self.generator_generator(environment['raw_valid_samples_gen'])
+        environment['raw_test_samples_gen'] = self.generator_generator(environment['raw_test_samples_gen'])
+        if 'transformations' not in environment:
+            environment['transformations'] = []
+        environment['transformations'].append((self.transform, [], self.__class__.__name__))
+        return environment
 
 class PruneInfrequentWords(AbstractFlowComponent):
     def __init__(self, min_token_count):
