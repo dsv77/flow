@@ -540,7 +540,7 @@ class MaxWordsFlowComponent(AbstractFlowComponent):
         token2count = environment['token2count']
         if max_words < len(token_dict):
             sorted_words = sorted(token2count.items(), key=operator.itemgetter(1), reverse=True)
-            sorted_words = dict([(s, c) for s, c in sorted_words][0:max_words])
+            sorted_words = dict([(s, c) for s, c in sorted_words if s in token_dict][0:max_words])
             sorted_words = [w for w, _ in sorted(token_dict.items(), key=lambda x: x[1]) if w in sorted_words]
             environment['token2id'] = dict(zip(sorted_words, range(0, max_words)))
         return environment
@@ -665,6 +665,39 @@ class PruneNonDictTokensTransformerFlowComponent(AbstractTransformerFlowComponen
         return environment
 
 
+
+"""
+Removes all non-bigrams tokens 
+"""
+class PruneNonBigramTokensFlowComponent(AbstractFlowComponent):
+    def __init__(self, threshold=10.0, min_count=5):
+        super(self.__class__, self).__init__()
+        self.threshold = threshold
+        self.min_count = min_count
+
+
+    def execute(self, environment={}):
+        prune_list = {}
+        token2count = environment['token2count']
+        token2id = environment['token2id']
+        N = len(token2id)
+        for token in token2id:
+            if '_' in token:
+                w1, w2 = token.split('_')
+                if w1 not in token2count or w2 not in token2count or token not in token2count:
+                    continue
+                if N*(token2count[token]-self.min_count)/(token2count[w1]*token2count[w2]) < self.threshold:
+                    prune_list[token] = None
+        np.random.seed(2)
+
+        print ('Pruning %i bigrams' % len(prune_list))
+        # print(prune_list)
+        words = [s for s, c in token2id.items() if s not in prune_list]
+        words = sorted(words)
+        environment['token2id'] = dict(zip(words, range(0, len(words))))
+        return environment
+
+
 """
 A tokenize component expects a text to be a string. Output are the tokenized words.
 """
@@ -738,8 +771,6 @@ class LimitSampleTextFlowComponent(AbstractFlowComponent):
         for gen_type in self.target_generators:
             environment[gen_type] = self.raw_train_samples_gen(environment[gen_type])
         return environment
-
-
 
 
 """
@@ -992,7 +1023,38 @@ class RemovePunktFlowComponent(AbstractTransformerFlowComponent):
         environment['transformations'].append((self.transform, [], self.__class__.__name__))
         return environment
 
+class DanishNormalizeFlowComponent(AbstractTransformerFlowComponent):
+    def generator_generator(self, it):
+        def new_generator():
+            iterator = it()
+            for sample in iterator:
+                text = sample['text']
+                if len(text) > 0:
+                    text = self.transform(text)
+                    sample['text'] = text
+                yield sample
+        return new_generator
 
+
+    def transform(self, text, env=None):
+        text = text.replace('ae', 'æ')
+        text = text.replace('oe', 'ø')
+        text = text.replace('aa', 'å')
+        text = text.replace('Ae', 'Æ')
+        text = text.replace('Oe', 'Ø')
+        text = text.replace('Aa', 'Å')
+        return text
+
+
+
+    def execute(self, environment={}):
+        environment['raw_train_samples_gen'] = self.generator_generator(environment['raw_train_samples_gen'])
+        environment['raw_valid_samples_gen'] = self.generator_generator(environment['raw_valid_samples_gen'])
+        environment['raw_test_samples_gen'] = self.generator_generator(environment['raw_test_samples_gen'])
+        if 'transformations' not in environment:
+            environment['transformations'] = []
+        environment['transformations'].append((self.transform, [], self.__class__.__name__))
+        return environment
 
 class PruneInfrequentWords(AbstractFlowComponent):
     def __init__(self, min_token_count):
@@ -1007,7 +1069,7 @@ class PruneInfrequentWords(AbstractFlowComponent):
         id_counter = 0
         pruning_count = 0
         for token,_ in token_order:
-            count = token2count[token]
+            count = token2count[token] if token in token2count else 0
             if count >= self.min_token_count:
                 token2id[token] = id_counter
                 id_counter += 1
@@ -1066,7 +1128,7 @@ class LoadToken2IdFlowComponent(AbstractFlowComponent):
             token2id = {}
             id_counter = 1
             for sample_num, row in enumerate(environment['raw_train_samples_gen']()):
-                if sample_num > 0 and sample_num % 1000 == 0:
+                if sample_num > 0 and sample_num % 10000 == 0:
                     print (sample_num)
                 for field in self.fields:
                     text = row[field]
@@ -1136,13 +1198,18 @@ class LoadClass2IdFlowComponent(AbstractFlowComponent):
         if os.path.isfile(class2id_file):
             class2id = pickle.load(open(class2id_file, 'rb'))
         else:
-            class2id = {}
-            counter = 0
-            for i, sample in enumerate(environment['raw_train_samples_gen']()):
-                class_name = sample['class_']
-                if class_name not in class2id:
-                    class2id[class_name] = counter
-                    counter+=1
+            if 'class2samples' in environment:
+                print('Using class2smaples for class2id')
+                classes = list(environment['class2samples'].keys())
+                class2id = dict((c, i) for i, c in enumerate(classes))
+            else:
+                class2id = {}
+                counter = 0
+                for i, sample in enumerate(environment['raw_train_samples_gen']()):
+                    class_name = sample['class_']
+                    if class_name not in class2id:
+                        class2id[class_name] = counter
+                        counter+=1
             pickle.dump(class2id, open(class2id_file, 'wb'))
         environment['class2id'] = class2id
         environment.setdefault('dependencies', [])
