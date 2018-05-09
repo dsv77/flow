@@ -847,8 +847,9 @@ class StemmmingFlowComponent(AbstractTransformerFlowComponent):
 
 
 class TrainModelFlowComponent(AbstractFlowComponent):
-    def __init__(self):
+    def __init__(self,  class_weight=None):
         super(self.__class__, self).__init__()
+        self.class_weight = class_weight
 
     def execute(self, environment={}):
         valid_batch_generator = environment['encoded_valid_samples_gen']
@@ -866,6 +867,7 @@ class TrainModelFlowComponent(AbstractFlowComponent):
                 nb_val_samples=int(environment['num_validation_samples']),
                 # validation_data=environment['valid_samples'],
                 nb_worker=1,
+                class_weight=self.class_weight,
                 # pickle_safe=True,
                 callbacks=environment['callbacks'])
         else:
