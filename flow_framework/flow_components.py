@@ -92,19 +92,26 @@ class ConfigLoaderFlowComponent(AbstractFlowComponent):
 
 
 class CreateModelFlowComponent(AbstractFlowComponent):
-    def __init__(self, config_module):
+    def __init__(self, config_module, clear_models=False):
         super(self.__class__, self).__init__()
         self.config_module = config_module
+        self.clear_models = clear_models
 
     def execute(self, environment={}):
         print ('Creating model ' + self.config_module)
-        if 'model_names' not in environment:
+        environment.setdefault('model_names', [])
+        environment.setdefault('models',[])
+        if self.clear_models:
+            import gc
+            for m in environment['models']:
+                del m
+            gc.collect()
             environment['model_names'] = []
-        environment['model_names'].append(self.config_module)
+            environment['models'] = []
         config = import_module('{}'.format(self.config_module)).Config()
         environment = config.create_model(environment)
-        environment.setdefault('models',[])
         environment['models'].append(environment['model'])
+        environment['model_names'].append(self.config_module)
         print("Number of parameters in model (trainable+non-trainable): %i" % environment['model'].count_params())
         return environment
 
@@ -806,8 +813,10 @@ CacheTrainGeneratorGeneratorsFlowComponent makes a cached copy of the train the 
  is to avoid having to e.g. tokenize more than once.
 """
 class CacheTrainGeneratorGeneratorsFlowComponent(AbstractFlowComponent):
-    def __init__(self):
+    def __init__(self, cache_name=None, sample_file_name='cached_samples.pkl'):
         super(self.__class__, self).__init__()
+        self.cache_name = cache_name
+        self.sample_file_name = sample_file_name
 
     def raw_train_samples_gen(self, generator):
         def new_generator():
@@ -817,10 +826,17 @@ class CacheTrainGeneratorGeneratorsFlowComponent(AbstractFlowComponent):
 
     def execute(self, environment={}):
         all_samples = []
-        for s in environment['raw_train_samples_gen']():
-            all_samples.append(s)
-            if len(all_samples) % 10000 == 0:
-                print('Cached %i samples' % len(all_samples))
+        if self.cache_name is None or not os.path.isfile(os.path.join('cache', self.cache_name, self.sample_file_name)):
+            for s in environment['raw_train_samples_gen']():
+                all_samples.append(s)
+                if len(all_samples) % 10000 == 0:
+                    print('Cached %i samples' % len(all_samples))
+        if self.cache_name is not None:
+            file_name = os.path.join('cache', self.cache_name, self.sample_file_name)
+            if not os.path.isfile(file_name):
+                pickle.dump(all_samples, open(file_name, 'wb'))
+            else:
+                all_samples = pickle.load(open(file_name, 'rb'))
         environment['raw_train_samples_gen'] = self.raw_train_samples_gen(all_samples)
         return environment
 
