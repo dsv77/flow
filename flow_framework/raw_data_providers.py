@@ -412,6 +412,40 @@ class WikiMultilingualAbstractsProvider(BaseProvider):
 
 
 
+"""
+Raw data iterator for a list of samples
+"""
+class SampleListProvider(BaseProvider):
+    def __init__(self, samples, valid_frac=0.0, test_frac=0.0):
+        idx1 = int(len(samples)*(1.0-valid_frac-test_frac))
+        idx2 = int(len(samples)*(1.0-valid_frac))
+        self.train_samples = samples[0:idx1]
+        self.test_samples = samples[idx1:idx2]
+        self.valid_samples = samples[idx2::]
+
+    def raw_train_samples_gen(self):
+        for text in self.train_samples:
+            sample = {'class_': None, 'text': text}
+            yield sample
+
+
+    def raw_valid_samples_gen(self):
+        for text in self.valid_samples:
+            sample = {'class_': None, 'text': text}
+            yield sample
+
+    def raw_test_samples_gen(self):
+        for text in self.test_samples:
+            sample = {'class_': None, 'text': text}
+            yield sample
+
+    def prepare(self):
+        pass
+
+    def load_data(self):
+        pass
+
+
 
 
 
