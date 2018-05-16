@@ -532,13 +532,17 @@ class AddModelToEnsembleFlowComponent(AbstractFlowComponent):
 
 
 class MaxWordsFlowComponent(AbstractFlowComponent):
-    def __init__(self):
+    def __init__(self, max_words = None):
         super(self.__class__, self).__init__()
+        self.max_words = max_words
 
 
     def execute(self, environment={}):
         np.random.seed(2)
-        max_words = int(environment['config']['tokens']['max_tokens'])
+        if self.max_words is not None:
+            max_words = self.max_words
+        else:
+            max_words = int(environment['config']['tokens']['max_tokens'])
         if max_words < 0:
             return
         token_dict = environment['token2id']
