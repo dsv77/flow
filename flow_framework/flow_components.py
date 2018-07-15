@@ -550,7 +550,8 @@ class MaxWordsFlowComponent(AbstractFlowComponent):
         print ('Using only the most frequent %i words' % max_words)
         token2count = environment['token2count']
         if max_words < len(token_dict):
-            sorted_words = sorted(token2count.items(), key=operator.itemgetter(1), reverse=True)
+            np.random.seed(2)
+            sorted_words = sorted(token2count.items(), key=(lambda x: (x[1], x[0])), reverse=True)
             sorted_words = dict([(s, c) for s, c in sorted_words if s in token_dict][0:max_words])
             sorted_words = [w for w, _ in sorted(token_dict.items(), key=lambda x: x[1]) if w in sorted_words]
             environment['token2id'] = dict(zip(sorted_words, range(0, max_words)))
